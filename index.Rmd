@@ -1,5 +1,6 @@
 ---
 title: "MyLabJournal"
+author: "Moritz Grün"
 output: html_document
 ---
 

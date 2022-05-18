@@ -1,6 +1,6 @@
 ---
 title: "06 Deep Learning"
-date: "2020-11-05"
+date: "2022-18-05"
 output:
   html_document:
     toc: true
@@ -15,40 +15,145 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message=FALSE,warning=FALSE, cache=TRUE)
 ```
-
-**IMPORTANT:** You can delete everything in here and start fresh. You might want to start by not deleting anything above this line until you know what that stuff is doing.
-
-This is an `.Rmd` file. It is plain text with special features. Any time you write just like this, it will be compiled to normal text in the website. If you put a \# in front of your text, it will create a top level-header.
-
-# My first post
-
-Last compiled: `r Sys.Date()`
-
-Notice that whatever you define as a top level header, automatically gets put into the table of contents bar on the left. 
-
-## Second level header
-
-You can add more headers by adding more hashtags. These won't be put into the table of contents
-
-### third level header
-
-Here's an even lower level header
-
-# My second post (note the order)
-
-Last compiled: `r Sys.Date()`
-
-I'm writing this tutorial going from the top down. And, this is how it will be printed. So, notice the second post is second in the list. If you want your most recent post to be at the top, then make a new post starting at the top. If you want the oldest first, do, then keep adding to the bottom
-
-# Adding R stuff
-
-So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
-
-So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
-
+# Challenge DEEP LEARNING
+## Import Data
 ```{r}
-samples <- rnorm(100, mean=0, sd=1)
-hist(samples)
+library(tidyverse)
+library(keras)
+library(lime)
+library(rsample)
+library(recipes)
+library(yardstick)
+library(corrr)
+
+#Import Data
+churn_data_raw <- read.csv("~/Documents/GitHub/data/Business Decisions with Machine Learning/WA_Fn-UseC_-Telco-Customer-Churn.csv")
+churn_data_raw%>%glimpse()
+churn_data_tbl <- churn_data_raw %>%
+  select(-customerID) 
 ```
 
-When you knit this R Markdown document, you will see that the histogram is printed to the page, along with the R code. This document can be set up to hide the R code in the webpage, just delete the comment (hashtag) from the cold folding option in the yaml header up top. For purposes of letting yourself see the code, and me see the code, best to keep it the way that it is. You'll learn that all of these things and more can be customized in each R code block.
+```{r}
+churn_data_tbl<-na.omit(object =churn_data_tbl )
+churn_data_tbl<-churn_data_tbl %>% select(Churn, everything())
+
+set.seed(100)
+train_test_split <- sample(c(rep(0, 0.8* nrow(churn_data_tbl)), rep(1, 0.2 * nrow(churn_data_tbl))))
+
+train_test_split
+data_train <- churn_data_tbl[train_test_split == 0, ]  
+data_test <- churn_data_tbl[train_test_split == 1, ]  
+hist(churn_data_tbl$tenure)
+churn_data_tbl %>% ggplot(aes(x = tenure)) + 
+  geom_histogram(bins = 6, color = "white", fill =  "#2DC6D6") +
+  labs(
+    title = "Tenure Counts With Six Bins",
+    x     = "tenure (month)"
+  )
+hist(churn_data_tbl$TotalCharges)
+hist(log(churn_data_tbl$TotalCharges))
+data_train %>%
+  select(Churn, TotalCharges) %>%
+  mutate(
+    Churn = Churn %>% as.factor() %>% as.numeric(),
+    LogTotalCharges = log(TotalCharges)
+  ) %>%
+  correlate() %>%
+  focus(Churn) %>%
+  fashion()
+churn_data_tbl %>% 
+  pivot_longer(cols      = c(Contract, InternetService, MultipleLines, PaymentMethod), 
+               names_to  = "feature", 
+               values_to = "category") %>% 
+  ggplot(aes(category)) +
+  geom_bar(fill = "#2DC6D6") +
+  facet_wrap(~ feature, scales = "free") +
+  labs(
+    title = "Features with multiple categories: Need to be one-hot encoded"
+  ) +
+  theme(axis.text.x = element_text(angle = 25, 
+                                   hjust = 1))
+```
+
+# Create Recipe
+```{r}
+#Create Recipe
+rec_obj <- recipe(Churn ~ ., data = data_train) %>%
+  step_rm(Churn) %>% 
+  step_discretize(tenure, options = list(cuts = 6)) %>%
+  step_log(TotalCharges) %>%
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = T) %>%
+  step_center(all_predictors(), -all_outcomes()) %>%
+  step_scale(all_predictors(), -all_outcomes()) %>%
+  prep(data = data_train)
+
+x_train_tbl <- bake( rec_obj , new_data = data_train)
+x_test_tbl  <- bake( rec_obj , new_data = data_test)
+```
+## y_train_vec <- ifelse() #figure this out
+## y_test_vec  <- ifelse() #figure this out
+
+
+## ```{r}
+model_keras <- keras_model_sequential()
+
+model_keras %>% 
+  # First hidden layer
+  layer_dense(
+    units              = 16, 
+    kernel_initializer = "uniform", 
+    activation         = "relu", 
+    input_shape        = ncol(x_train_tbl)) %>% 
+  # Dropout to prevent overfitting
+  layer_dropout(rate = 0.1) %>%
+  # Second hidden layer
+  layer_dense(
+    units              = 16, 
+    kernel_initializer = "uniform", 
+    activation         = "relu") %>% 
+  # Dropout to prevent overfitting
+  layer_dropout(rate = 0.1) %>%
+  # Output layer
+  layer_dense(
+    units              = 1, 
+    kernel_initializer = "uniform", 
+    activation         = "sigmoid") %>% 
+  # Compile ANN
+  compile(
+    optimizer = 'adam',
+    loss      = 'binary_crossentropy',
+    metrics   = c('accuracy')
+  )
+model_keras
+
+fit_keras <- fit(
+  x_train_tbl,
+  y_train_vec,  
+  epochs              = 35 , 
+  batch_size              = 50 , 
+  validation_split = 0.3  
+  
+  
+)
+
+fit_keras
+
+plot(fit_keras) +
+  labs(title = "Deep Learning Training Results") +
+  theme(legend.position  = "bottom", 
+        strip.placement  = "inside",
+        strip.background = element_rect(fill = "#grey"))
+
+yhat_keras_class_vec <- predict_classes(object = model_keras, x = as.matrix(x_test_tbl)) %>%
+  as.vector()
+
+## Predicted Class Probability
+yhat_keras_prob_vec  <- predict_proba(object = model_keras, x = as.matrix(x_test_tbl)) %>%
+  as.vector()
+
+estimates_keras_tbl <- tibble(
+  truth      = as.factor(y_test_vec) %>% fct_recode(yes = "1", no = "0"),
+  estimate   = as.factor(yhat_keras_class_vec) %>% fct_recode(yes = "1", no = "0"),
+  class_prob = yhat_keras_prob_vec
+)
+
