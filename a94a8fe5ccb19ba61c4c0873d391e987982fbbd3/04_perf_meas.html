@@ -10,7 +10,6 @@
 
 
 
-<meta name="date" content="2020-11-05" />
 
 <title>04 Performance Measures</title>
 
@@ -374,69 +373,899 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">04 Performance Measures</h1>
-<h4 class="date">2020-11-05</h4>
+<h4 class="date">2022-18-05</h4>
 
 </div>
 
 
-<p><strong>IMPORTANT:</strong> You can delete everything in here and
-start fresh. You might want to start by not deleting anything above this
-line until you know what that stuff is doing.</p>
-<p>This is an <code>.Rmd</code> file. It is plain text with special
-features. Any time you write just like this, it will be compiled to
-normal text in the website. If you put a # in front of your text, it
-will create a top level-header.</p>
-<div id="my-first-post" class="section level1" number="1">
-<h1><span class="header-section-number">1</span> My first post</h1>
-<p>Last compiled: 2022-05-17</p>
-<p>Notice that whatever you define as a top level header, automatically
-gets put into the table of contents bar on the left.</p>
-<div id="second-level-header" class="section level2" number="1.1">
-<h2><span class="header-section-number">1.1</span> Second level
-header</h2>
-<p>You can add more headers by adding more hashtags. These won’t be put
-into the table of contents</p>
-<div id="third-level-header" class="section level3" number="1.1.1">
-<h3><span class="header-section-number">1.1.1</span> third level
-header</h3>
-<p>Here’s an even lower level header</p>
+<div id="load-the-training-test-dataset" class="section level2"
+number="0.1">
+<h2><span class="header-section-number">0.1</span> Load the training
+&amp; test dataset</h2>
+<pre class="r"><code>library(tidyverse)
+# Modeling
+library(parsnip)
+# Pre-processing &amp; Sampling
+library(recipes)
+library(rsample)
+# Modeling Error Metrics
+library(yardstick)
+library(workflows)
+library(tune)
+
+product_data &lt;- read_csv(&quot;~/Documents/GitHub/data/Business Decisions with Machine Learning/product_backorders.csv&quot;)
+product_data2 &lt;- product_data %&gt;% 
+  mutate(
+      product_backorder = went_on_backorder %&gt;% str_to_lower() %&gt;% str_detect(&quot;yes&quot;) %&gt;% as.numeric()
+  ) %&gt;% 
+  mutate(product_backorder = as.factor(product_backorder)) %&gt;%
+  select(-c(went_on_backorder))
+glimpse(product_data)</code></pre>
+<pre><code>## Rows: 19,053
+## Columns: 23
+## $ sku               &lt;dbl&gt; 1113121, 1113268, 1113874, 1114222, 1114823, 1115453…
+## $ national_inv      &lt;dbl&gt; 0, 0, 20, 0, 0, 55, -34, 4, 2, -7, 1, 2, 0, 0, 0, 0,…
+## $ lead_time         &lt;dbl&gt; 8, 8, 2, 8, 12, 8, 8, 9, 8, 8, 8, 8, 12, 2, 12, 4, 2…
+## $ in_transit_qty    &lt;dbl&gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0…
+## $ forecast_3_month  &lt;dbl&gt; 6, 2, 45, 9, 31, 216, 120, 43, 4, 56, 2, 5, 5, 54, 4…
+## $ forecast_6_month  &lt;dbl&gt; 6, 3, 99, 14, 31, 360, 240, 67, 6, 96, 4, 9, 6, 72, …
+## $ forecast_9_month  &lt;dbl&gt; 6, 4, 153, 21, 31, 492, 240, 115, 9, 112, 6, 13, 9, …
+## $ sales_1_month     &lt;dbl&gt; 0, 1, 16, 5, 7, 30, 83, 5, 1, 13, 0, 1, 0, 0, 1, 0, …
+## $ sales_3_month     &lt;dbl&gt; 4, 2, 42, 17, 15, 108, 122, 22, 5, 30, 2, 5, 4, 0, 3…
+## $ sales_6_month     &lt;dbl&gt; 9, 3, 80, 36, 33, 275, 144, 40, 6, 56, 3, 8, 5, 0, 4…
+## $ sales_9_month     &lt;dbl&gt; 12, 3, 111, 43, 47, 340, 165, 58, 9, 76, 4, 11, 6, 0…
+## $ min_bank          &lt;dbl&gt; 0, 0, 10, 0, 2, 51, 33, 4, 2, 0, 0, 0, 3, 4, 0, 0, 0…
+## $ potential_issue   &lt;chr&gt; &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;…
+## $ pieces_past_due   &lt;dbl&gt; 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ perf_6_month_avg  &lt;dbl&gt; 0.90, 0.96, 0.81, 0.96, 0.98, 0.00, 1.00, 0.69, 1.00…
+## $ perf_12_month_avg &lt;dbl&gt; 0.89, 0.97, 0.88, 0.98, 0.98, 0.00, 0.97, 0.68, 0.95…
+## $ local_bo_qty      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 34, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, …
+## $ deck_risk         &lt;chr&gt; &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;…
+## $ oe_constraint     &lt;chr&gt; &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;…
+## $ ppap_risk         &lt;chr&gt; &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;Yes&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No…
+## $ stop_auto_buy     &lt;chr&gt; &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Ye…
+## $ rev_stop          &lt;chr&gt; &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;, &quot;No&quot;…
+## $ went_on_backorder &lt;chr&gt; &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Yes&quot;, &quot;Ye…</code></pre>
+<pre class="r"><code>split_obj&lt;- initial_split(product_data2, prop = 0.75)
+train_tbl&lt;- training(split_obj)
+test_tbl&lt;- testing(split_obj)</code></pre>
+</div>
+<div id="specifiy-the-response-and-predictor-variables"
+class="section level2" number="0.2">
+<h2><span class="header-section-number">0.2</span> Specifiy the response
+and predictor variables</h2>
+<pre class="r"><code>recipe_obj &lt;- recipe(product_backorder ~., data = train_tbl) %&gt;% 
+    step_zv(all_predictors()) %&gt;% 
+    step_dummy(all_nominal(),-all_outcomes()) %&gt;%
+    prep()</code></pre>
+<pre class="r"><code>summary(recipe_obj)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["variable"],"name":[1],"type":["chr"],"align":["left"]},{"label":["type"],"name":[2],"type":["chr"],"align":["left"]},{"label":["role"],"name":[3],"type":["chr"],"align":["left"]},{"label":["source"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"sku","2":"numeric","3":"predictor","4":"original"},{"1":"national_inv","2":"numeric","3":"predictor","4":"original"},{"1":"lead_time","2":"numeric","3":"predictor","4":"original"},{"1":"in_transit_qty","2":"numeric","3":"predictor","4":"original"},{"1":"forecast_3_month","2":"numeric","3":"predictor","4":"original"},{"1":"forecast_6_month","2":"numeric","3":"predictor","4":"original"},{"1":"forecast_9_month","2":"numeric","3":"predictor","4":"original"},{"1":"sales_1_month","2":"numeric","3":"predictor","4":"original"},{"1":"sales_3_month","2":"numeric","3":"predictor","4":"original"},{"1":"sales_6_month","2":"numeric","3":"predictor","4":"original"},{"1":"sales_9_month","2":"numeric","3":"predictor","4":"original"},{"1":"min_bank","2":"numeric","3":"predictor","4":"original"},{"1":"pieces_past_due","2":"numeric","3":"predictor","4":"original"},{"1":"perf_6_month_avg","2":"numeric","3":"predictor","4":"original"},{"1":"perf_12_month_avg","2":"numeric","3":"predictor","4":"original"},{"1":"local_bo_qty","2":"numeric","3":"predictor","4":"original"},{"1":"product_backorder","2":"nominal","3":"outcome","4":"original"},{"1":"potential_issue_Yes","2":"numeric","3":"predictor","4":"derived"},{"1":"deck_risk_Yes","2":"numeric","3":"predictor","4":"derived"},{"1":"oe_constraint_Yes","2":"numeric","3":"predictor","4":"derived"},{"1":"ppap_risk_Yes","2":"numeric","3":"predictor","4":"derived"},{"1":"stop_auto_buy_Yes","2":"numeric","3":"predictor","4":"derived"},{"1":"rev_stop_Yes","2":"numeric","3":"predictor","4":"derived"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
 </div>
 </div>
+<div id="run-automl-specifying-the-stopping-criterion"
+class="section level2" number="0.3">
+<h2><span class="header-section-number">0.3</span> run AutoML specifying
+the stopping criterion</h2>
+<pre class="r"><code>Sys.setenv(JAVA_HOME=&quot;/Library/Java/JavaVirtualMachines/jdk-17.0.3.1.jdk/Contents/Home&quot;)
+Sys.setenv(https_proxy=&quot;&quot;) 
+Sys.setenv(http_proxy=&quot;&quot;) 
+Sys.setenv(http_proxy_user=&quot;&quot;) 
+Sys.setenv(https_proxy_user=&quot;&quot;)
+library(h2o)
+h2o.init()</code></pre>
+<pre><code>##  Connection successful!
+## 
+## R is connected to the H2O cluster: 
+##     H2O cluster uptime:         1 hours 50 minutes 
+##     H2O cluster timezone:       Europe/Berlin 
+##     H2O data parsing timezone:  UTC 
+##     H2O cluster version:        3.36.0.4 
+##     H2O cluster version age:    1 month and 17 days  
+##     H2O cluster name:           H2O_started_from_R_moritzgruen_wrn987 
+##     H2O cluster total nodes:    1 
+##     H2O cluster total memory:   1.53 GB 
+##     H2O cluster total cores:    8 
+##     H2O cluster allowed cores:  8 
+##     H2O cluster healthy:        TRUE 
+##     H2O Connection ip:          localhost 
+##     H2O Connection port:        54321 
+##     H2O Connection proxy:       NA 
+##     H2O Internal Security:      FALSE 
+##     R Version:                  R version 4.2.0 (2022-04-22)</code></pre>
+<pre class="r"><code># Split data into a training and a validation data frame
+# Setting the seed is just for reproducability
+split_h2o &lt;- h2o.splitFrame(as.h2o(train_tbl), ratios = c(0.75), seed = 42)</code></pre>
+<pre><code>## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
+<pre class="r"><code>train_h2o &lt;- split_h2o[[1]]
+valid_h2o &lt;- split_h2o[[2]]
+test_h2o  &lt;- as.h2o(test_tbl)</code></pre>
+<pre><code>## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
+<pre class="r"><code># Set the target and predictors
+y &lt;- &quot;product_backorder&quot;
+x &lt;- setdiff(names(train_h2o), y)</code></pre>
+<pre class="r"><code>automl_models_h2o &lt;- h2o.automl(
+  x = x,
+  y = y,
+  training_frame    = train_h2o,
+  validation_frame  = valid_h2o,
+  leaderboard_frame = test_h2o,
+  max_runtime_secs  = 120,
+  nfolds            = 5,
+  stopping_metric = &quot;auc&quot;, stopping_rounds = 3,
+                        stopping_tolerance = 1e-2
+)</code></pre>
+<pre><code>## 
+  |                                                                            
+  |                                                                      |   0%
+## 12:00:29.686: User specified a validation frame with cross-validation still enabled. Please note that the models will still be validated using cross-validation only, the validation frame will be used to provide purely informative validation metrics on the trained models.
+## 12:00:29.687: AutoML: XGBoost is not available; skipping it.
+## 12:00:29.688: Step &#39;best_of_family_xgboost&#39; not defined in provider &#39;StackedEnsemble&#39;: skipping it.
+## 12:00:29.688: Step &#39;all_xgboost&#39; not defined in provider &#39;StackedEnsemble&#39;: skipping it.
+## 12:00:29.689: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |==                                                                    |   2%
+## 12:00:31.703: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |===                                                                   |   4%
+## 12:00:32.732: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |====                                                                  |   6%
+## 12:00:34.786: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |=====                                                                 |   7%
+  |                                                                            
+  |======                                                                |   8%
+## 12:00:36.860: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |=======                                                               |  10%
+## 12:00:37.910: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |=========                                                             |  12%
+## 12:00:38.959: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |==========                                                            |  15%
+## 12:00:39.985: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |===========                                                           |  16%
+  |                                                                            
+  |=============                                                         |  18%
+## 12:00:43.67: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |==============                                                        |  19%
+## 12:00:46.151: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+## 12:00:48.216: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |==============                                                        |  20%
+## 12:00:49.245: _train param, Dropping bad and constant columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |================                                                      |  22%
+## 12:00:50.266: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |==================                                                    |  26%
+  |                                                                            
+  |====================                                                  |  28%
+## 12:00:53.351: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |====================                                                  |  29%
+  |                                                                            
+  |=====================                                                 |  29%
+  |                                                                            
+  |=====================                                                 |  30%
+  |                                                                            
+  |======================                                                |  31%
+  |                                                                            
+  |======================                                                |  32%
+  |                                                                            
+  |=======================                                               |  33%
+  |                                                                            
+  |========================                                              |  34%
+  |                                                                            
+  |=============================                                         |  42%
+  |                                                                            
+  |==============================                                        |  42%
+  |                                                                            
+  |==============================                                        |  43%
+  |                                                                            
+  |===============================                                       |  44%
+  |                                                                            
+  |===============================                                       |  45%
+  |                                                                            
+  |================================                                      |  46%
+  |                                                                            
+  |=================================                                     |  46%
+  |                                                                            
+  |=================================                                     |  47%
+  |                                                                            
+  |==================================                                    |  48%
+  |                                                                            
+  |==================================                                    |  49%
+  |                                                                            
+  |===================================                                   |  50%
+  |                                                                            
+  |====================================                                  |  51%
+  |                                                                            
+  |====================================                                  |  52%
+  |                                                                            
+  |=====================================                                 |  53%
+  |                                                                            
+  |======================================                                |  54%
+  |                                                                            
+  |=======================================                               |  55%
+  |                                                                            
+  |=======================================                               |  56%
+  |                                                                            
+  |========================================                              |  57%
+  |                                                                            
+  |=========================================                             |  58%
+  |                                                                            
+  |=========================================                             |  59%
+  |                                                                            
+  |==========================================                            |  60%
+  |                                                                            
+  |==========================================                            |  61%
+  |                                                                            
+  |===========================================                           |  61%
+  |                                                                            
+  |============================================                          |  62%
+  |                                                                            
+  |============================================                          |  63%
+  |                                                                            
+  |=============================================                         |  64%
+  |                                                                            
+  |=============================================                         |  65%
+  |                                                                            
+  |==============================================                        |  66%
+  |                                                                            
+  |===============================================                       |  67%
+  |                                                                            
+  |===============================================                       |  68%
+  |                                                                            
+  |================================================                      |  69%
+  |                                                                            
+  |=================================================                     |  70%
+  |                                                                            
+  |==================================================                    |  71%
+  |                                                                            
+  |===================================================                   |  72%
+  |                                                                            
+  |===================================================                   |  73%
+  |                                                                            
+  |====================================================                  |  74%
+  |                                                                            
+  |====================================================                  |  75%
+  |                                                                            
+  |=====================================================                 |  76%
+  |                                                                            
+  |======================================================                |  77%
+  |                                                                            
+  |=======================================================               |  78%
+## 12:02:04.570: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |=======================================================               |  79%
+  |                                                                            
+  |========================================================              |  80%
+  |                                                                            
+  |=========================================================             |  81%
+## 12:02:07.649: _train param, Dropping unused columns: [potential_issue, ppap_risk, rev_stop, stop_auto_buy, deck_risk, oe_constraint]
+  |                                                                            
+  |=========================================================             |  82%
+  |                                                                            
+  |==========================================================            |  83%
+  |                                                                            
+  |==========================================================            |  84%
+  |                                                                            
+  |===========================================================           |  84%
+  |                                                                            
+  |============================================================          |  85%
+  |                                                                            
+  |============================================================          |  86%
+  |                                                                            
+  |=============================================================         |  87%
+  |                                                                            
+  |==============================================================        |  88%
+  |                                                                            
+  |==============================================================        |  89%
+  |                                                                            
+  |===============================================================       |  90%
+  |                                                                            
+  |===============================================================       |  91%
+  |                                                                            
+  |================================================================      |  91%
+  |                                                                            
+  |=================================================================     |  92%
+  |                                                                            
+  |=================================================================     |  93%
+  |                                                                            
+  |==================================================================    |  94%
+  |                                                                            
+  |==================================================================    |  95%
+  |                                                                            
+  |===================================================================   |  96%
+  |                                                                            
+  |====================================================================  |  97%
+  |                                                                            
+  |====================================================================  |  98%
+  |                                                                            
+  |===================================================================== |  98%
+  |                                                                            
+  |======================================================================|  99%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
 </div>
-<div id="my-second-post-note-the-order" class="section level1"
+<div id="leaderboard-visualization" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> Leaderboard
+visualization</h1>
+<pre class="r"><code>#slotNames(automl_models_h2o)
+automl_models_h2o@leaderboard </code></pre>
+<pre><code>##                                                  model_id       auc   logloss
+## 1    StackedEnsemble_AllModels_3_AutoML_5_20220518_120029 0.9545780 0.1643227
+## 2 StackedEnsemble_BestOfFamily_4_AutoML_5_20220518_120029 0.9539042 0.1642608
+## 3 StackedEnsemble_BestOfFamily_3_AutoML_5_20220518_120029 0.9531517 0.1669676
+## 4    StackedEnsemble_AllModels_2_AutoML_5_20220518_120029 0.9530230 0.1669737
+## 5    StackedEnsemble_AllModels_1_AutoML_5_20220518_120029 0.9517937 0.1692384
+## 6 StackedEnsemble_BestOfFamily_2_AutoML_5_20220518_120029 0.9517029 0.1697750
+##       aucpr mean_per_class_error      rmse        mse
+## 1 0.7298601            0.1649279 0.2230146 0.04973551
+## 2 0.7282707            0.1442679 0.2219783 0.04927437
+## 3 0.7174243            0.1270246 0.2250432 0.05064445
+## 4 0.7224213            0.1663036 0.2251673 0.05070030
+## 5 0.7149046            0.1780360 0.2265748 0.05133615
+## 6 0.7083266            0.1520590 0.2268680 0.05146908
+## 
+## [39 rows x 7 columns]</code></pre>
+<pre class="r"><code>summary(automl_models_h2o@leaderboard %&gt;% 
+              as_tibble() )</code></pre>
+<pre><code>##    model_id              auc            logloss           aucpr       
+##  Length:39          Min.   :0.6782   Min.   :0.1643   Min.   :0.1919  
+##  Class :character   1st Qu.:0.7759   1st Qu.:0.1769   1st Qu.:0.3751  
+##  Mode  :character   Median :0.9376   Median :0.1935   Median :0.6659  
+##                     Mean   :0.8841   Mean   :0.2294   Mean   :0.5707  
+##                     3rd Qu.:0.9474   3rd Qu.:0.3123   3rd Qu.:0.7015  
+##                     Max.   :0.9546   Max.   :0.3627   Max.   :0.7299  
+##  mean_per_class_error      rmse             mse         
+##  Min.   :0.1270       Min.   :0.2220   Min.   :0.04927  
+##  1st Qu.:0.1644       1st Qu.:0.2285   1st Qu.:0.05220  
+##  Median :0.1780       Median :0.2400   Median :0.05758  
+##  Mean   :0.2204       Mean   :0.2541   Mean   :0.06557  
+##  3rd Qu.:0.3029       3rd Qu.:0.2973   3rd Qu.:0.08837  
+##  Max.   :0.3842       Max.   :0.3066   Max.   :0.09402</code></pre>
+<pre class="r"><code>data_transformed_tbl &lt;- automl_models_h2o@leaderboard %&gt;%
+        as_tibble() %&gt;%
+        select(-c(rmse, mse)) %&gt;% 
+        mutate(model_type = str_extract(model_id, &quot;[^_]+&quot;)) %&gt;%
+        slice(1:15) %&gt;% 
+        rownames_to_column(var = &quot;rowname&quot;) %&gt;%
+        # Visually this step will not change anything
+        # It reorders the factors under the hood
+        mutate(
+          model_id   = as_factor(model_id) %&gt;% reorder(auc),
+          model_type = as.factor(model_type)
+          ) %&gt;% 
+          pivot_longer(cols = -c(model_id, model_type, rowname), 
+                       names_to = &quot;key&quot;, 
+                       values_to = &quot;value&quot;, 
+                       names_transform = list(key = forcats::fct_inorder)
+                       ) %&gt;% 
+        mutate(model_id = paste0(rowname, &quot;. &quot;, model_id) %&gt;% as_factor() %&gt;% fct_rev())
+
+
+data_transformed_tbl %&gt;%
+        ggplot(aes(value, model_id, color = model_type)) +
+        geom_point(size = 3) +
+        geom_label(aes(label = round(value, 2), hjust = &quot;inward&quot;)) +
+        
+        # Facet to break out logloss and auc
+        facet_wrap(~ key, scales = &quot;free_x&quot;) +
+        labs(title = &quot;Leaderboard Metrics&quot;,
+             subtitle = paste0(&quot;Ordered by: &quot;, &quot;auc&quot;),
+             y = &quot;Model Postion, Model ID&quot;, x = &quot;&quot;) + 
+        theme(legend.position = &quot;bottom&quot;)</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+</div>
+<div id="tune-a-model-with-grid-search" class="section level1"
 number="2">
-<h1><span class="header-section-number">2</span> My second post (note
-the order)</h1>
-<p>Last compiled: 2022-05-17</p>
-<p>I’m writing this tutorial going from the top down. And, this is how
-it will be printed. So, notice the second post is second in the list. If
-you want your most recent post to be at the top, then make a new post
-starting at the top. If you want the oldest first, do, then keep adding
-to the bottom</p>
+<h1><span class="header-section-number">2</span> Tune a model with grid
+search</h1>
+<pre class="r"><code>deeplearning_grid_01 &lt;- h2o.grid(
+
+    # See help page for available algos
+    algorithm = &quot;deeplearning&quot;,
+    
+    # I just use the same as the object
+    grid_id = &quot;deeplearning_grid_01&quot;,
+    
+    # The following is for ?h2o.deeplearning()
+    # predictor and response variables
+    x = x,
+    y = y,
+    
+    # training and validation frame and crossfold validation
+    training_frame   = train_h2o,
+    validation_frame = valid_h2o,
+    nfolds = 5,
+    # Hyperparamters: Use deeplearning_h2o@allparameters to see all
+    hyper_params = list(
+        # Use some combinations (the first one was the original)
+        hidden = list(c(10, 10, 10), c(20, 15, 10), c(20, 20, 20)),
+        epochs = c(10, 15, 20)
+    )
+)</code></pre>
+<pre><code>## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
+<pre class="r"><code>h2o.getGrid(grid_id = &quot;deeplearning_grid_01&quot;, sort_by = &quot;auc&quot;, decreasing = TRUE)</code></pre>
+<pre><code>## H2O Grid Details
+## ================
+## 
+## Grid ID: deeplearning_grid_01 
+## Used hyper parameters: 
+##   -  epochs 
+##   -  hidden 
+## Number of models: 18 
+## Number of failed models: 0 
+## 
+## Hyper-Parameter Search Summary: ordered by decreasing auc
+##      epochs       hidden                     model_ids     auc
+## 1  20.79729 [20, 20, 20]  deeplearning_grid_01_model_9 0.84674
+## 2  20.80645 [10, 10, 10]  deeplearning_grid_01_model_3 0.82452
+## 3  15.60540 [20, 20, 20]  deeplearning_grid_01_model_8 0.81998
+## 4  20.78242 [20, 15, 10]  deeplearning_grid_01_model_6 0.81609
+## 5  20.78666 [20, 15, 10] deeplearning_grid_01_model_15 0.80513
+## 6  15.59473 [20, 20, 20] deeplearning_grid_01_model_17 0.80185
+## 7  20.80166 [20, 20, 20] deeplearning_grid_01_model_18 0.80132
+## 8  10.40101 [20, 15, 10]  deeplearning_grid_01_model_4 0.79977
+## 9  10.40403 [20, 20, 20]  deeplearning_grid_01_model_7 0.79306
+## 10 15.59068 [10, 10, 10] deeplearning_grid_01_model_11 0.79007
+## 11 15.62498 [20, 15, 10]  deeplearning_grid_01_model_5 0.78979
+## 12 15.61111 [10, 10, 10]  deeplearning_grid_01_model_2 0.78886
+## 13 15.61558 [20, 15, 10] deeplearning_grid_01_model_14 0.78552
+## 14 20.80245 [10, 10, 10] deeplearning_grid_01_model_12 0.78238
+## 15 10.39853 [10, 10, 10] deeplearning_grid_01_model_10 0.76352
+## 16 10.39774 [20, 20, 20] deeplearning_grid_01_model_16 0.76127
+## 17 10.39389 [20, 15, 10] deeplearning_grid_01_model_13 0.74494
+## 18 10.40830 [10, 10, 10]  deeplearning_grid_01_model_1 0.73830</code></pre>
+<pre class="r"><code>deeplearning_grid_01_model_1 &lt;- h2o.getModel(&quot;deeplearning_grid_01_model_8&quot;)
+
+deeplearning_grid_01_model_1 %&gt;% h2o.auc(train = T, valid = T, xval = T)</code></pre>
+<pre><code>##     train     valid      xval 
+## 0.8767499 0.8472030 0.8199834</code></pre>
+<pre class="r"><code>performance_h2o &lt;-deeplearning_grid_01_model_1 %&gt;%
+    h2o.performance(newdata = as.h2o(test_tbl))</code></pre>
+<pre><code>## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
+<pre class="r"><code>performance_h2o</code></pre>
+<pre><code>## H2OBinomialMetrics: deeplearning
+## 
+## MSE:  0.0797148
+## RMSE:  0.2823381
+## LogLoss:  0.2744356
+## Mean Per-Class Error:  0.237229
+## AUC:  0.8594269
+## AUCPR:  0.4833992
+## Gini:  0.7188538
+## 
+## Confusion Matrix (vertical: actual; across: predicted) for F1-optimal threshold:
+##           0   1    Error       Rate
+## 0      3928 316 0.074458  =316/4244
+## 1       208 312 0.400000   =208/520
+## Totals 4136 628 0.109992  =524/4764
+## 
+## Maximum Metrics: Maximum metrics at their respective thresholds
+##                         metric threshold       value idx
+## 1                       max f1  0.111031    0.543554 211
+## 2                       max f2  0.080170    0.610812 258
+## 3                 max f0point5  0.146276    0.535000 177
+## 4                 max accuracy  0.179616    0.903233 157
+## 5                max precision  0.954985    1.000000   0
+## 6                   max recall  0.000035    1.000000 399
+## 7              max specificity  0.954985    1.000000   0
+## 8             max absolute_mcc  0.112055    0.484468 210
+## 9   max min_per_class_accuracy  0.078887    0.789821 260
+## 10 max mean_per_class_accuracy  0.078380    0.792182 261
+## 11                     max tns  0.954985 4244.000000   0
+## 12                     max fns  0.954985  519.000000   0
+## 13                     max fps  0.000035 4244.000000 399
+## 14                     max tps  0.000035  520.000000 399
+## 15                     max tnr  0.954985    1.000000   0
+## 16                     max fnr  0.954985    0.998077   0
+## 17                     max fpr  0.000035    1.000000 399
+## 18                     max tpr  0.000035    1.000000 399
+## 
+## Gains/Lift Table: Extract with `h2o.gainsLift(&lt;model&gt;, &lt;data&gt;)` or `h2o.gainsLift(&lt;model&gt;, valid=&lt;T/F&gt;, xval=&lt;T/F&gt;)`</code></pre>
 </div>
-<div id="adding-r-stuff" class="section level1" number="3">
-<h1><span class="header-section-number">3</span> Adding R stuff</h1>
-<p>So far this is just a blog where you can write in plain text and
-serve your writing to a webpage. One of the main purposes of this lab
-journal is to record your progress learning R. The reason I am asking
-you to use this process is because you can both make a website, and a
-lab journal, and learn R all in R-studio. This makes everything really
-convenient and in the same place.</p>
-<p>So, let’s say you are learning how to make a histogram in R. For
-example, maybe you want to sample 100 numbers from a normal distribution
-with mean = 0, and standard deviation = 1, and then you want to plot a
-histogram. You can do this right here by using an r code block, like
-this:</p>
-<pre class="r"><code>samples &lt;- rnorm(100, mean=0, sd=1)
-hist(samples)</code></pre>
-<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-1-1.png" width="672" /></p>
-<p>When you knit this R Markdown document, you will see that the
-histogram is printed to the page, along with the R code. This document
-can be set up to hide the R code in the webpage, just delete the comment
-(hashtag) from the cold folding option in the yaml header up top. For
-purposes of letting yourself see the code, and me see the code, best to
-keep it the way that it is. You’ll learn that all of these things and
-more can be customized in each R code block.</p>
+<div
+id="visualize-the-trade-of-between-the-precision-and-the-recall-and-the-optimal-threshold"
+class="section level1" number="3">
+<h1><span class="header-section-number">3</span> Visualize the trade of
+between the precision and the recall and the optimal threshold</h1>
+<pre class="r"><code>h2o.confusionMatrix(performance_h2o)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["0"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["1"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Error"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["Rate"],"name":[4],"type":["chr"],"align":["left"]}],"data":[{"1":"3928","2":"316","3":"0.07445806","4":"=316/4244","_rn_":"0"},{"1":"208","2":"312","3":"0.40000000","4":"=208/520","_rn_":"1"},{"1":"4136","2":"628","3":"0.10999160","4":"=524/4764","_rn_":"Totals"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>performance_tbl &lt;- performance_h2o %&gt;%
+    h2o.metric() %&gt;%
+    as.tibble()
+
+
+theme_new &lt;- theme(
+      legend.position  = &quot;bottom&quot;,
+      legend.key       = element_blank(),,
+      panel.background = element_rect(fill   = &quot;transparent&quot;),
+      panel.border     = element_rect(color = &quot;black&quot;, fill = NA, size = 0.5),
+      panel.grid.major = element_line(color = &quot;grey&quot;, size = 0.333)
+      ) 
+
+
+performance_tbl %&gt;%
+    filter(f1 == max(f1))</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["threshold"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["f1"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["f2"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["f0point5"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["accuracy"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["precision"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["recall"],"name":[7],"type":["dbl"],"align":["right"]},{"label":["specificity"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["absolute_mcc"],"name":[9],"type":["dbl"],"align":["right"]},{"label":["min_per_class_accuracy"],"name":[10],"type":["dbl"],"align":["right"]},{"label":["mean_per_class_accuracy"],"name":[11],"type":["dbl"],"align":["right"]},{"label":["tns"],"name":[12],"type":["dbl"],"align":["right"]},{"label":["fns"],"name":[13],"type":["dbl"],"align":["right"]},{"label":["fps"],"name":[14],"type":["dbl"],"align":["right"]},{"label":["tps"],"name":[15],"type":["dbl"],"align":["right"]},{"label":["tnr"],"name":[16],"type":["dbl"],"align":["right"]},{"label":["fnr"],"name":[17],"type":["dbl"],"align":["right"]},{"label":["fpr"],"name":[18],"type":["dbl"],"align":["right"]},{"label":["tpr"],"name":[19],"type":["dbl"],"align":["right"]},{"label":["idx"],"name":[20],"type":["int"],"align":["right"]}],"data":[{"1":"0.1110313","2":"0.543554","3":"0.5760709","4":"0.5145119","5":"0.8900084","6":"0.4968153","7":"0.6","8":"0.9255419","9":"0.4844251","10":"0.6","11":"0.762771","12":"3928","13":"208","14":"316","15":"312","16":"0.9255419","17":"0.4","18":"0.07445806","19":"0.6","20":"211"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>performance_tbl %&gt;%
+    ggplot(aes(x = threshold)) +
+    geom_line(aes(y = precision), color = &quot;blue&quot;, size = 1) +
+    geom_line(aes(y = recall), color = &quot;red&quot;, size = 1) +
+    
+    # Insert line where precision and recall are harmonically optimized
+    geom_vline(xintercept = h2o.find_threshold_by_max_metric(performance_h2o, &quot;f1&quot;)) +
+    labs(title = &quot;Precision vs Recall&quot;, y = &quot;value&quot;) +
+    theme_new</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
+<pre class="r"><code># extract_h2o_model_name_by_position &lt;- function(h2o_grid, n = 1, verbose = T) {
+# 
+#     model_name &lt;- h2o_grid %&gt;%
+#         as.tibble() %&gt;%
+#         slice_(n) %&gt;%
+#         pull(model_id)
+# 
+#     if (verbose) message(model_name)
+# 
+#     return(model_name)
+# 
+# }
+
+best_model &lt;- h2o.getModel(&quot;deeplearning_grid_01_model_8&quot;)
+
+best_model %&gt;% h2o.saveModel(path = &quot;04_perf_meas_model&quot;,force = TRUE)</code></pre>
+<pre><code>## [1] &quot;/Users/moritzgruen/Documents/GitHub/bdml-monacomoritz/04_perf_meas_model/deeplearning_grid_01_model_8&quot;</code></pre>
+<pre class="r"><code>load_model_performance_metrics &lt;- function(path, test_tbl) {
+    
+    model_h2o &lt;- h2o.loadModel(path)
+    perf_h2o  &lt;- h2o.performance(model_h2o, newdata = as.h2o(test_tbl)) 
+    
+    perf_h2o %&gt;%
+        h2o.metric() %&gt;%
+        as_tibble() %&gt;%
+        mutate(auc = h2o.auc(perf_h2o)) %&gt;%
+        select(tpr, fpr, auc, precision, recall)
+    
+}</code></pre>
+</div>
+<div id="plot" class="section level1" number="4">
+<h1><span class="header-section-number">4</span> PLOT</h1>
+<div id="roc-plot" class="section level2" number="4.1">
+<h2><span class="header-section-number">4.1</span> ROC Plot</h2>
+<pre class="r"><code>model_metrics_tbl &lt;- fs::dir_info(path = &quot;04_perf_meas_model&quot;) %&gt;%
+    select(path) %&gt;%
+    mutate(metrics = map(path, load_model_performance_metrics, test_tbl)) %&gt;%
+    unnest(cols = metrics)</code></pre>
+<pre><code>## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%</code></pre>
+<pre class="r"><code>glimpse(model_metrics_tbl)</code></pre>
+<pre><code>## Rows: 400
+## Columns: 6
+## $ path      &lt;fs::path&gt; &quot;04_perf_meas_model/deeplearning_grid_01_model_8&quot;, &quot;04_…
+## $ tpr       &lt;dbl&gt; 0.001923077, 0.001923077, 0.003846154, 0.005769231, 0.007692…
+## $ fpr       &lt;dbl&gt; 0.0000000000, 0.0002356268, 0.0002356268, 0.0002356268, 0.00…
+## $ auc       &lt;dbl&gt; 0.8594269, 0.8594269, 0.8594269, 0.8594269, 0.8594269, 0.859…
+## $ precision &lt;dbl&gt; 1.0000000, 0.5000000, 0.6666667, 0.7500000, 0.8000000, 0.666…
+## $ recall    &lt;dbl&gt; 0.001923077, 0.001923077, 0.003846154, 0.005769231, 0.007692…</code></pre>
+<pre class="r"><code>model_metrics_tbl %&gt;%
+    mutate(
+        # Extract the model names
+        path = str_split(path, pattern = &quot;/&quot;, simplify = T)[,2] %&gt;% as_factor(),
+        auc  = auc %&gt;% round(3) %&gt;% as.character() %&gt;% as_factor()
+        ) %&gt;%
+    ggplot(aes(fpr, tpr, color = path, linetype = auc)) +
+    geom_line(size = 1) +
+
+    # just for demonstration purposes
+    geom_abline(color = &quot;red&quot;, linetype = &quot;dotted&quot;) +
+
+    theme_new +
+    theme(
+      legend.direction = &quot;vertical&quot;,
+      ) +
+    labs(
+        title = &quot;ROC Plot&quot;,
+        subtitle = &quot;Performance of 3 Top Performing Models&quot;
+    )</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-15-1.png" width="672" /></p>
+</div>
+<div id="precision-vs-recall-plot" class="section level2" number="4.2">
+<h2><span class="header-section-number">4.2</span> Precision vs Recall
+Plot</h2>
+<pre class="r"><code>model_metrics_tbl %&gt;%
+    mutate(
+        path = str_split(path, pattern = &quot;/&quot;, simplify = T)[,2] %&gt;% as_factor(),
+        auc  = auc %&gt;% round(3) %&gt;% as.character() %&gt;% as_factor()
+    ) %&gt;%
+    ggplot(aes(recall, precision, color = path, linetype = auc)) +
+    geom_line(size = 1) +
+    theme_new + 
+    theme(
+      legend.direction = &quot;vertical&quot;,
+      ) +
+    labs(
+        title = &quot;Precision vs Recall Plot&quot;,
+        subtitle = &quot;Performance of 3 Top Performing Models&quot;
+    )</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-16-1.png" width="672" /></p>
+</div>
+<div id="gain-plot" class="section level2" number="4.3">
+<h2><span class="header-section-number">4.3</span> Gain Plot</h2>
+<pre class="r"><code>gain_lift_tbl &lt;- performance_h2o %&gt;%
+    h2o.gainsLift() %&gt;%
+    as.tibble()
+
+## Gain Chart
+
+gain_transformed_tbl &lt;- gain_lift_tbl %&gt;% 
+    select(group, cumulative_data_fraction, cumulative_capture_rate, cumulative_lift) %&gt;%
+    select(-contains(&quot;lift&quot;)) %&gt;%
+    mutate(baseline = cumulative_data_fraction) %&gt;%
+    rename(gain     = cumulative_capture_rate) %&gt;%
+    # prepare the data for the plotting (for the color and group aesthetics)
+    pivot_longer(cols = c(gain, baseline), values_to = &quot;value&quot;, names_to = &quot;key&quot;)
+
+gain_transformed_tbl %&gt;%
+    ggplot(aes(x = cumulative_data_fraction, y = value, color = key)) +
+    geom_line(size = 1.5) +
+    labs(
+        title = &quot;Gain Chart&quot;,
+        x = &quot;Cumulative Data Fraction&quot;,
+        y = &quot;Gain&quot;
+    ) +
+    theme_new</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-17-1.png" width="672" /></p>
+</div>
+<div id="lift-plot" class="section level2" number="4.4">
+<h2><span class="header-section-number">4.4</span> Lift Plot</h2>
+<pre class="r"><code>lift_transformed_tbl &lt;- gain_lift_tbl %&gt;% 
+    select(group, cumulative_data_fraction, cumulative_capture_rate, cumulative_lift) %&gt;%
+    select(-contains(&quot;capture&quot;)) %&gt;%
+    mutate(baseline = 1) %&gt;%
+    rename(lift = cumulative_lift) %&gt;%
+    pivot_longer(cols = c(lift, baseline), values_to = &quot;value&quot;, names_to = &quot;key&quot;)
+
+lift_transformed_tbl %&gt;%
+    ggplot(aes(x = cumulative_data_fraction, y = value, color = key)) +
+    geom_line(size = 1.5) +
+    labs(
+        title = &quot;Lift Chart&quot;,
+        x = &quot;Cumulative Data Fraction&quot;,
+        y = &quot;Lift&quot;
+    ) +
+    theme_new</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-18-1.png" width="672" /></p>
+</div>
+<div id="dashboard-with-cowplot" class="section level2" number="4.5">
+<h2><span class="header-section-number">4.5</span> Dashboard with
+cowplot</h2>
+<pre class="r"><code>library(cowplot)
+library(glue)
+
+
+# set values to test the function while building it
+h2o_leaderboard &lt;- automl_models_h2o@leaderboard
+newdata &lt;- test_tbl
+order_by &lt;- &quot;auc&quot;
+max_models &lt;- 4
+size &lt;- 1
+
+plot_h2o_performance &lt;- function(h2o_leaderboard, newdata, order_by = c(&quot;auc&quot;, &quot;logloss&quot;),
+                                 max_models = 3, size = 1.5) {
+    
+    # Inputs
+    
+    leaderboard_tbl &lt;- h2o_leaderboard %&gt;%
+        as_tibble() %&gt;%
+        slice(1:max_models)
+    
+    newdata_tbl &lt;- newdata %&gt;%
+        as_tibble()
+    
+    # Selecting the first, if nothing is provided
+    order_by      &lt;- tolower(order_by[[1]]) 
+    
+    # Convert string stored in a variable to column name (symbol)
+    order_by_expr &lt;- rlang::sym(order_by)
+
+    # Turn of the progress bars ( opposite h2o.show_progress())
+    h2o.no_progress()
+    
+    # 1. Model metrics
+    
+    get_model_performance_metrics &lt;- function(model_id, test_tbl) {
+        
+        model_h2o &lt;- h2o.getModel(model_id)
+        perf_h2o  &lt;- h2o.performance(model_h2o, newdata = as.h2o(test_tbl))
+        
+        perf_h2o %&gt;%
+            h2o.metric() %&gt;%
+            as.tibble() %&gt;%
+            select(threshold, tpr, fpr, precision, recall)
+        
+    }
+    
+    model_metrics_tbl &lt;- leaderboard_tbl %&gt;%
+        mutate(metrics = map(model_id, get_model_performance_metrics, newdata_tbl)) %&gt;%
+        unnest(cols = metrics) %&gt;%
+        mutate(
+          model_id = as_factor(model_id) %&gt;% 
+                      # programmatically reorder factors depending on order_by
+                      fct_reorder(!! order_by_expr, 
+                                  .desc = ifelse(order_by == &quot;auc&quot;, TRUE, FALSE)),
+          auc      = auc %&gt;% 
+                      round(3) %&gt;% 
+                      as.character() %&gt;% 
+                      as_factor() %&gt;% 
+                      fct_reorder(as.numeric(model_id)),
+          logloss  = logloss %&gt;% 
+                      round(4) %&gt;% 
+                      as.character() %&gt;% 
+                      as_factor() %&gt;% 
+                      fct_reorder(as.numeric(model_id))
+        )
+    
+    
+    # 1A. ROC Plot
+    
+    p1 &lt;- model_metrics_tbl %&gt;%
+        ggplot(aes(fpr, tpr, color = model_id, linetype = !! order_by_expr)) +
+        geom_line(size = size) +
+        theme_new +
+        labs(title = &quot;ROC&quot;, x = &quot;FPR&quot;, y = &quot;TPR&quot;) +
+        theme(legend.direction = &quot;vertical&quot;) 
+        
+    
+    # 1B. Precision vs Recall
+    
+    p2 &lt;- model_metrics_tbl %&gt;%
+        ggplot(aes(recall, precision, color = model_id, linetype = !! order_by_expr)) +
+        geom_line(size = size) +
+        theme_new +
+        labs(title = &quot;Precision Vs Recall&quot;, x = &quot;Recall&quot;, y = &quot;Precision&quot;) +
+        theme(legend.position = &quot;none&quot;) 
+    
+    
+    # 2. Gain / Lift
+    
+    get_gain_lift &lt;- function(model_id, test_tbl) {
+        
+        model_h2o &lt;- h2o.getModel(model_id)
+        perf_h2o  &lt;- h2o.performance(model_h2o, newdata = as.h2o(test_tbl)) 
+        
+        perf_h2o %&gt;%
+            h2o.gainsLift() %&gt;%
+            as.tibble() %&gt;%
+            select(group, cumulative_data_fraction, cumulative_capture_rate, cumulative_lift)
+        
+    }
+    
+    gain_lift_tbl &lt;- leaderboard_tbl %&gt;%
+        mutate(metrics = map(model_id, get_gain_lift, newdata_tbl)) %&gt;%
+        unnest(cols = metrics) %&gt;%
+        mutate(
+            model_id = as_factor(model_id) %&gt;% 
+                fct_reorder(!! order_by_expr, 
+                            .desc = ifelse(order_by == &quot;auc&quot;, TRUE, FALSE)),
+            auc  = auc %&gt;% 
+                round(3) %&gt;% 
+                as.character() %&gt;% 
+                as_factor() %&gt;% 
+                fct_reorder(as.numeric(model_id)),
+            logloss = logloss %&gt;% 
+                round(4) %&gt;% 
+                as.character() %&gt;% 
+                as_factor() %&gt;% 
+                fct_reorder(as.numeric(model_id))
+        ) %&gt;%
+        rename(
+            gain = cumulative_capture_rate,
+            lift = cumulative_lift
+        ) 
+    
+    # 2A. Gain Plot
+    
+    p3 &lt;- gain_lift_tbl %&gt;%
+        ggplot(aes(cumulative_data_fraction, gain, 
+                          color = model_id, linetype = !! order_by_expr)) +
+        geom_line(size = size,) +
+        geom_segment(x = 0, y = 0, xend = 1, yend = 1, 
+                     color = &quot;red&quot;, size = size, linetype = &quot;dotted&quot;) +
+        theme_new +
+        expand_limits(x = c(0, 1), y = c(0, 1)) +
+        labs(title = &quot;Gain&quot;,
+             x = &quot;Cumulative Data Fraction&quot;, y = &quot;Gain&quot;) +
+        theme(legend.position = &quot;none&quot;)
+    
+    # 2B. Lift Plot
+    
+    p4 &lt;- gain_lift_tbl %&gt;%
+        ggplot(aes(cumulative_data_fraction, lift, 
+                          color = model_id, linetype = !! order_by_expr)) +
+        geom_line(size = size) +
+        geom_segment(x = 0, y = 1, xend = 1, yend = 1, 
+                     color = &quot;red&quot;, size = size, linetype = &quot;dotted&quot;) +
+        theme_new +
+        expand_limits(x = c(0, 1), y = c(0, 1)) +
+        labs(title = &quot;Lift&quot;,
+             x = &quot;Cumulative Data Fraction&quot;, y = &quot;Lift&quot;) +
+        theme(legend.position = &quot;none&quot;) 
+    
+    
+    # Combine using cowplot
+    
+    # cowplot::get_legend extracts a legend from a ggplot object
+    p_legend &lt;- get_legend(p1)
+    # Remove legend from p1
+    p1 &lt;- p1 + theme(legend.position = &quot;none&quot;)
+    
+    # cowplot::plt_grid() combines multiple ggplots into a single cowplot object
+    p &lt;- cowplot::plot_grid(p1, p2, p3, p4, ncol = 2)
+    
+    # cowplot::ggdraw() sets up a drawing layer
+    p_title &lt;- ggdraw() + 
+    
+        # cowplot::draw_label() draws text on a ggdraw layer / ggplot object
+        draw_label(&quot;H2O Model Metrics&quot;, size = 18, fontface = &quot;bold&quot;, 
+                   color = &quot;#2C3E50&quot;)
+    
+    p_subtitle &lt;- ggdraw() + 
+        draw_label(glue(&quot;Ordered by {toupper(order_by)}&quot;), size = 10,  
+                   color = &quot;#2C3E50&quot;)
+    
+    # Combine everything
+    ret &lt;- plot_grid(p_title, p_subtitle, p, p_legend, 
+    
+                     # Adjust the relative spacing, so that the legends always fits
+                     ncol = 1, rel_heights = c(0.05, 0.05, 1, 0.05 * max_models))
+    
+    h2o.show_progress()
+    
+    return(ret)
+    
+}
+
+automl_models_h2o@leaderboard %&gt;%
+    plot_h2o_performance(newdata = test_tbl, order_by = &quot;logloss&quot;, 
+                         size = 0.5, max_models = 4)</code></pre>
+<p><img src="04_perf_meas_files/figure-html/unnamed-chunk-19-1.png" width="672" /></p>
+</div>
 </div>
 
 

@@ -1,7 +1,7 @@
 ---
-title: "Session 6 - Challenge - Company Segmentation"
+title: "01 Machine Learning Fundamentals"
 author: "Moritz Grün"
-date: "5/16/2022"
+date: "2022-17-05"
 output: 
     html_document:
         toc: TRUE
